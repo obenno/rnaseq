@@ -189,6 +189,8 @@ if (params.save_trimmed)  { trimgalore_options.publish_files.put('fq.gz','') }
 
 def star_align_options            = modules['star_align']
 star_align_options.args          += params.save_unaligned ? Utils.joinModuleArgs(['--outReadsUnmapped Fastx']) : ''
+// Force to output sorted bam by default
+star_align_options.args          += params.output_unsorted ? '' : Utils.joinModuleArgs(['--outSAMtype BAM SortedByCoordinate'])
 if (params.save_align_intermeds)  { star_align_options.publish_files.put('bam','') }
 if (params.save_unaligned)        { star_align_options.publish_files.put('fastq.gz','unmapped') }
 

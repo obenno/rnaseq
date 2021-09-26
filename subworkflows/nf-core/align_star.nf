@@ -9,7 +9,8 @@ params.samtools_stats_options = [:]
 
 include { STAR_ALIGN        } from '../../modules/nf-core/modules/star/align/main' addParams( options: params.align_options    )
 include { BAM_SORT_SAMTOOLS } from './bam_sort_samtools'                           addParams( sort_options: params.samtools_sort_options, index_options: params.samtools_index_options, stats_options: params.samtools_stats_options )
-
+include { SAMTOOLS_INDEX     } from '../../modules/nf-core/modules/samtools/index/main' addParams( options: params.index_options )
+include { BAM_STATS_SAMTOOLS } from './bam_stats_samtools'                              addParams( options: params.stats_options )
 workflow ALIGN_STAR {
     take:
     reads // channel: [ val(meta), [ reads ] ]
@@ -25,9 +26,27 @@ workflow ALIGN_STAR {
 
     //
     // Sort, index BAM file and run samtools stats, flagstat and idxstats
-    //
-    BAM_SORT_SAMTOOLS ( STAR_ALIGN.out.bam )
+    // If STAR already output sortedByCoord.out.bam, then no need to sort
+    if (STAR_ALIGN.out.bam.contains('sortedByCoord.out.bam')) {
+       SAMTOOLS_INDEX     ( STAR_ALIGN.out.bam )
+       STAR_ALIGN.out.bam
+        .join(SAMTOOLS_INDEX.out.bai, by: [0], remainder: true)
+        .join(SAMTOOLS_INDEX.out.csi, by: [0], remainder: true)
+        .map {
+            meta, bam, bai, csi ->
+                if (bai) {
+                    [ meta, bam, bai ]
+                } else {
+                    [ meta, bam, csi ]
+                }
+        }
+        .set { ch_bam_bai }
 
+       BAM_STATS_SAMTOOLS ( ch_bam_bai )       
+    }else{
+       BAM_SORT_SAMTOOLS ( STAR_ALIGN.out.bam )
+    }
+    
     emit:
     orig_bam         = STAR_ALIGN.out.bam             // channel: [ val(meta), bam            ]
     log_final        = STAR_ALIGN.out.log_final       // channel: [ val(meta), log_final      ]
@@ -39,11 +58,11 @@ workflow ALIGN_STAR {
     tab              = STAR_ALIGN.out.tab             // channel: [ val(meta), tab            ]
     star_version     = STAR_ALIGN.out.version         // path: *.version.txt
 
-    bam              = BAM_SORT_SAMTOOLS.out.bam      // channel: [ val(meta), [ bam ] ]
-    bai              = BAM_SORT_SAMTOOLS.out.bai      // channel: [ val(meta), [ bai ] ]
-    csi              = BAM_SORT_SAMTOOLS.out.csi      // channel: [ val(meta), [ csi ] ]
-    stats            = BAM_SORT_SAMTOOLS.out.stats    // channel: [ val(meta), [ stats ] ]
-    flagstat         = BAM_SORT_SAMTOOLS.out.flagstat // channel: [ val(meta), [ flagstat ] ]
-    idxstats         = BAM_SORT_SAMTOOLS.out.idxstats // channel: [ val(meta), [ idxstats ] ]
-    samtools_version = BAM_SORT_SAMTOOLS.out.version  //    path: *.version.txt
+    bam              = (STAR_ALIGN.out.bam.contains('sortedByCoord.out.bam')) ? STAR_ALIGN.out.bam : BAM_SORT_SAMTOOLS.out.bam      // channel: [ val(meta), [ bam ] ]
+    bai              = (STAR_ALIGN.out.bam.contains('sortedByCoord.out.bam')) ? SAMTOOLS_INDEX.out.bai : BAM_SORT_SAMTOOLS.out.bai      // channel: [ val(meta), [ bai ] ]
+    csi              = (STAR_ALIGN.out.bam.contains('sortedByCoord.out.bam')) ? SAMTOOLS_INDEX.out.csi : BAM_SORT_SAMTOOLS.out.csi      // channel: [ val(meta), [ csi ] ]
+    stats            = (STAR_ALIGN.out.bam.contains('sortedByCoord.out.bam')) ? BAM_STATS_SAMTOOLS.out.stats : BAM_SORT_SAMTOOLS.out.stats    // channel: [ val(meta), [ stats ] ]
+    flagstat         = (STAR_ALIGN.out.bam.contains('sortedByCoord.out.bam')) ? BAM_STATS_SAMTOOLS.out.flagstat : BAM_SORT_SAMTOOLS.out.flagstat // channel: [ val(meta), [ flagstat ] ]
+    idxstats         = (STAR_ALIGN.out.bam.contains('sortedByCoord.out.bam')) ? BAM_STATS_SAMTOOLS.out.idxstats : BAM_SORT_SAMTOOLS.out.idxstats // channel: [ val(meta), [ idxstats ] ]
+    samtools_version = (STAR_ALIGN.out.bam.contains('sortedByCoord.out.bam')) ? SAMTOOLS_INDEX.out.version : BAM_SORT_SAMTOOLS.out.version  //    path: *.version.txt
 }

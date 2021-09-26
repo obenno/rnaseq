@@ -213,8 +213,9 @@ if (['star_salmon','hisat2'].contains(params.aligner)) {
 }
 
 include { FASTQC_UMITOOLS_TRIMGALORE } from '../subworkflows/nf-core/fastqc_umitools_trimgalore' addParams( fastqc_options: modules['fastqc'], umitools_options: umitools_extract_options, trimgalore_options: trimgalore_options )
-include { ALIGN_STAR                 } from '../subworkflows/nf-core/align_star'                 addParams( align_options: star_align_options, samtools_sort_options: samtools_sort_genome_options, samtools_index_options: samtools_index_genome_options, samtools_stats_options: samtools_index_genome_options   )
+include { ALIGN_STAR                 } from '../subworkflows/local/align_star'                 addParams( align_options: star_align_options, samtools_sort_options: samtools_sort_genome_options, samtools_index_options: samtools_index_genome_options, samtools_stats_options: samtools_index_genome_options   )
 include { ALIGN_HISAT2               } from '../subworkflows/nf-core/align_hisat2'               addParams( align_options: hisat2_align_options, samtools_sort_options: samtools_sort_genome_options, samtools_index_options: samtools_index_genome_options, samtools_stats_options: samtools_index_genome_options )
+include { BAM_SORT_SAMTOOLS as BAM_SORT_STAROUT } from '../subworkflows/nf-core/bam_sort_samtools'          addParams( samtools_sort_options: samtools_sort_genome_options, samtools_index_options: samtools_index_genome_options, samtools_stats_options: samtools_index_genome_options )
 include { BAM_SORT_SAMTOOLS          } from '../subworkflows/nf-core/bam_sort_samtools'          addParams( sort_options: modules['samtools_sort_transcriptome'], index_options: modules['samtools_index_transcriptome'], stats_options: modules['samtools_index_transcriptome']      )
 include { MARK_DUPLICATES_PICARD     } from '../subworkflows/nf-core/mark_duplicates_picard'     addParams( markduplicates_options: modules['picard_markduplicates'], samtools_index_options: picard_markduplicates_samtools, samtools_stats_options:  picard_markduplicates_samtools )
 include { RSEQC                      } from '../subworkflows/nf-core/rseqc'                      addParams( bamstat_options: modules['rseqc_bamstat'], innerdistance_options: modules['rseqc_innerdistance'], inferexperiment_options: modules['rseqc_inferexperiment'], junctionannotation_options: modules['rseqc_junctionannotation'], junctionsaturation_options: modules['rseqc_junctionsaturation'], readdistribution_options: modules['rseqc_readdistribution'], readduplication_options: modules['rseqc_readduplication'] )
@@ -336,6 +337,20 @@ workflow RNASEQ {
         }
         ch_software_versions = ch_software_versions.mix(ALIGN_STAR.out.star_version.first().ifEmpty(null))
         ch_software_versions = ch_software_versions.mix(ALIGN_STAR.out.samtools_version.first().ifEmpty(null))
+
+        // If star output unsorted bam: with output_unsorted set to true, perform sort here
+        if (params.output_unsorted) {
+           BAM_SORT_STAROUT (ALIGN_STAR.out.bam)
+        }
+        ch_genome_bam        = BAM_SORT_STAROUT.out.bam
+        ch_genome_bam_index  = BAM_SORT_STAROUT.out.bai
+        ch_samtools_stats    = BAM_SORT_STAROUT.out.stats
+        ch_samtools_flagstat = BAM_SORT_STAROUT.out.flagstat
+        ch_samtools_idxstats = BAM_SORT_STAROUT.out.idxstats
+        if (params.bam_csi_index) {
+           ch_genome_bam_index  = BAM_SORT_STAROUT.out.csi
+        }
+        ch_software_versions = ch_software_versions.mix(BAM_SORT_STAROUT.out.samtools_version.first().ifEmpty(null))
 
         //
         // SUBWORKFLOW: Remove duplicate reads from BAM file based on UMIs

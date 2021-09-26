@@ -9,8 +9,8 @@ params.samtools_stats_options = [:]
 
 include { STAR_ALIGN        } from '../../modules/nf-core/modules/star/align/main' addParams( options: params.align_options    )
 include { BAM_SORT_SAMTOOLS } from './bam_sort_samtools'                           addParams( sort_options: params.samtools_sort_options, index_options: params.samtools_index_options, stats_options: params.samtools_stats_options )
-include { SAMTOOLS_INDEX     } from '../../modules/nf-core/modules/samtools/index/main' addParams( options: params.samtools_index_options )
-include { BAM_STATS_SAMTOOLS } from './bam_stats_samtools'                              addParams( options: params.samtools_stats_options )
+include { SAMTOOLS_INDEX     } from '../../modules/nf-core/modules/samtools/index/main' addParams( options: params.index_options )
+include { BAM_STATS_SAMTOOLS } from './bam_stats_samtools'                              addParams( options: params.stats_options )
 workflow ALIGN_STAR {
     take:
     reads // channel: [ val(meta), [ reads ] ]

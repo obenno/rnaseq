@@ -340,17 +340,21 @@ workflow RNASEQ {
 
         // If star output unsorted bam: with output_unsorted set to true, perform sort here
         if (params.output_unsorted) {
-           BAM_SORT_STAROUT (ALIGN_STAR.out.bam)
+            BAM_SORT_STAROUT (
+               ALIGN_STAR.out.bam
+            )
+        
+            ch_genome_bam        = BAM_SORT_STAROUT.out.bam
+            ch_genome_bam_index  = BAM_SORT_STAROUT.out.bai
+            ch_samtools_stats    = BAM_SORT_STAROUT.out.stats
+            ch_samtools_flagstat = BAM_SORT_STAROUT.out.flagstat
+            ch_samtools_idxstats = BAM_SORT_STAROUT.out.idxstats
+        
+            if (params.bam_csi_index) {
+                ch_genome_bam_index  = BAM_SORT_STAROUT.out.csi
+            }
+            ch_software_versions = ch_software_versions.mix(BAM_SORT_STAROUT.out.samtools_version.first().ifEmpty(null))
         }
-        ch_genome_bam        = BAM_SORT_STAROUT.out.bam
-        ch_genome_bam_index  = BAM_SORT_STAROUT.out.bai
-        ch_samtools_stats    = BAM_SORT_STAROUT.out.stats
-        ch_samtools_flagstat = BAM_SORT_STAROUT.out.flagstat
-        ch_samtools_idxstats = BAM_SORT_STAROUT.out.idxstats
-        if (params.bam_csi_index) {
-           ch_genome_bam_index  = BAM_SORT_STAROUT.out.csi
-        }
-        ch_software_versions = ch_software_versions.mix(BAM_SORT_STAROUT.out.samtools_version.first().ifEmpty(null))
 
         //
         // SUBWORKFLOW: Remove duplicate reads from BAM file based on UMIs
